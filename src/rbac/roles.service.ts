@@ -134,8 +134,7 @@ export class RolesService {
     if (!ctx) return this.repo.listUsersDirectory(q);
     const isSuperAdmin = ctx.access.isSuperAdmin;
     const hasDistrictRolesManage =
-      isSuperAdmin ||
-      ctx.access.roles.some((r) => r.roleKey === 'roles:manage' && (!r.scope || r.scope.type === 'none'));
+      isSuperAdmin || (ctx.access.grants['roles:manage'] ?? []).some((s) => s.type === 'none');
     const isRideOnly = !hasDistrictRolesManage;
     return this.repo.listUsersDirectory(q, isRideOnly);
   }

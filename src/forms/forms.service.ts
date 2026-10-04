@@ -197,21 +197,15 @@ export class FormsService implements OnModuleInit {
 
   assertCanManageForm(ctx: RequestContext, form?: any): void {
     if (ctx.access.isSuperAdmin) return;
-    const hasDistrictManage = ctx.access.roles.some(
-      (r) =>
-        (r.roleKey === 'forms:manage' || r.roleKey === 'roles:manage') &&
-        (!r.scope || r.scope.type === 'none'),
-    );
+    // `grants` is keyed by permission; role keys (dsc, president, ...) are never permission keys.
+    const formsManageScopes = ctx.access.grants['forms:manage'] ?? [];
+    const hasDistrictManage = formsManageScopes.some((s) => s.type === 'none');
     if (hasDistrictManage) return;
 
-    // Check if user has RIDE project admin scope
-    const hasRideManage = ctx.access.roles.some(
-      (r) =>
-        r.roleKey === 'project_admin:ride' ||
-        r.roleKey === 'subdomain:ride:manage' ||
-        r.roleKey === 'ride:manage' ||
-        (r.roleKey === 'forms:manage' && r.scope?.type === 'project' && r.scope?.id === 'ride'),
-    );
+    const hasRideManage =
+      formsManageScopes.some((s) => s.type === 'project' && s.id === 'ride') ||
+      (ctx.access.grants['subdomain:ride:manage'] ?? []).length > 0 ||
+      (ctx.access.grants['ride:manage'] ?? []).length > 0;
 
     if (hasRideManage) {
       if (form && !this.isRideForm(form)) {
@@ -400,11 +394,7 @@ export class FormsService implements OnModuleInit {
 
     const hasDistrictManage =
       ctx.access.isSuperAdmin ||
-      ctx.access.roles.some(
-        (r) =>
-          (r.roleKey === 'forms:manage' || r.roleKey === 'roles:manage') &&
-          (!r.scope || r.scope.type === 'none'),
-      );
+      (ctx.access.grants['forms:manage'] ?? []).some((s) => s.type === 'none');
 
     const applicantName = dto.applicantName || profile?.fullName || ctx.user.name;
     const applicantEmail = dto.applicantEmail || ctx.user.email;

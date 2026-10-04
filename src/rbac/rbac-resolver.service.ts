@@ -16,9 +16,7 @@ export class RbacResolverService {
 
   static fromGrants(userId: string, rows: UserRoleGrant[]): ResolvedAccess {
     const roles = rows.map((r) => ({ roleKey: r.roleKey, scope: toScope(r) }));
-    const isSuperAdmin = rows.some((r) =>
-      r.roleKey === SUPER_ADMIN_ROLE_KEY || r.roleKey === 'superadmin' || r.roleKey === 'district_admin',
-    );
+    const isSuperAdmin = rows.some((r) => r.roleKey === SUPER_ADMIN_ROLE_KEY);
     const grants: Partial<Record<PermissionKey, Scope[]>> = {};
     if (isSuperAdmin) {
       for (const key of PERMISSION_KEYS) grants[key] = [{ type: 'none' }];
