@@ -26,11 +26,10 @@ export function publicClubSummaryDto(row: PublicClubRow) {
 }
 
 export function publicClubDetailDto(row: PublicClubRow) {
+  // Keep contact PII redacted to match the summary; anonymous callers never get officer email/phone.
   return {
     ...publicClubSummaryDto(row),
     secretary: row.secretary,
-    secretaryEmail: row.secretaryEmail,
-    secretaryPhone: row.secretaryPhone,
     meetingInfo: row.meetingInfo,
     socialLinks: row.socialLinks ?? null,
     charterDate: day(row.charterDate),
@@ -42,9 +41,6 @@ export function publicBoardMemberDto(row: PublicBoardMemberRow) {
     id: row.id,
     name: row.name,
     position: row.position,
-    bloodGroup: row.bloodGroup,
-    phone: row.phone,
-    email: row.email,
     ryYear: row.ryYear,
   };
 }

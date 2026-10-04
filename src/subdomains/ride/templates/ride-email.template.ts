@@ -1,3 +1,5 @@
+import { escapeHtml } from '../../../notifications/templates/html-escape';
+
 export function generateBespokeRideEmailHtml(
   title: string,
   rawBody: string,
@@ -98,11 +100,12 @@ export function interpolateTokens(
     hostClub?: string;
   },
 ): string {
+  // Participant-controlled values are escaped; the surrounding template is admin-authored HTML.
   let result = template
-    .replace(/\{\{\s*(?:name|full_name)\s*\}\}/gi, data.fullName || 'Delegate')
-    .replace(/\{\{\s*district_number\s*\}\}/gi, data.districtNumber || '3011')
-    .replace(/\{\{\s*pass_reference\s*\}\}/gi, data.passReference || 'DMJ-2026-PASS')
-    .replace(/\{\{\s*host_club\s*\}\}/gi, data.hostClub || 'Designated Host Club');
+    .replace(/\{\{\s*(?:name|full_name)\s*\}\}/gi, escapeHtml(data.fullName || 'Delegate'))
+    .replace(/\{\{\s*district_number\s*\}\}/gi, escapeHtml(data.districtNumber || '3011'))
+    .replace(/\{\{\s*pass_reference\s*\}\}/gi, escapeHtml(data.passReference || 'DMJ-2026-PASS'))
+    .replace(/\{\{\s*host_club\s*\}\}/gi, escapeHtml(data.hostClub || 'Designated Host Club'));
 
   // Sanitize any remaining unparsed {{...}} placeholders so raw brackets never appear
   return result.replace(/\{\{[^}]+\}\}/g, '').trim();
