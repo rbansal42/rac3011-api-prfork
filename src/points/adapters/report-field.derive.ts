@@ -89,7 +89,15 @@ export function internationalActivities(activities: ReportActivityValue[]): numb
 }
 
 export function maxCollaborators(activities: ReportActivityValue[]): number {
-  return activities.reduce((max, a) => Math.max(max, a.collaborating_clubs?.length ?? 0), 0);
+  return activities.reduce((max, a) => {
+    if (!a.collaborating_clubs || a.collaborating_clubs.length === 0) return max;
+    const unique = new Set(
+      a.collaborating_clubs
+        .map((c) => String(c).trim().toLowerCase())
+        .filter(Boolean),
+    );
+    return Math.max(max, unique.size);
+  }, 0);
 }
 
 export function socialPostsCount(values: ReportValuesForDerivation): number {

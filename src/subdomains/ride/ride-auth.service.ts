@@ -349,25 +349,13 @@ export class RideAuthService implements OnModuleInit, OnModuleDestroy {
       },
     });
 
-    if (!participant) {
-      throw new UnauthorizedException(
-        'Participant account not found. Only registered RIDE delegates and participants can access this portal.',
-      );
-    }
-
-    if (!participant.isActive) {
-      throw new UnauthorizedException('Participant account is inactive. Please contact RIDE administration.');
-    }
-
-    if (!participant.passwordHash) {
-      throw new UnauthorizedException(
-        'Password has not been set for this participant account. Please ask RIDE administration to assign credentials.',
-      );
+    if (!participant || !participant.isActive || !participant.passwordHash) {
+      throw new UnauthorizedException('Invalid email or password.');
     }
 
     const isValid = await this.verifyPassword(password, participant.passwordHash);
     if (!isValid) {
-      throw new UnauthorizedException('Invalid credentials for this participant account.');
+      throw new UnauthorizedException('Invalid email or password.');
     }
 
     // Create tracked session with IP, userAgent, and rolling 2-hour inactivity timeout

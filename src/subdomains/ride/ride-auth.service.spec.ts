@@ -120,6 +120,6 @@ describe('RideAuthService', () => {
 
     await expect(
       service.login('suspended@rotaract.org', password),
-    ).rejects.toThrow('Participant account is inactive');
+    ).rejects.toThrow('Invalid email or password.');
   });
 });

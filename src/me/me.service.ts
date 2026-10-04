@@ -44,7 +44,7 @@ export class MeService {
     const existing = await this.repo.findProfileByUserId(ctx.user.id);
     if (!existing) throw new NotFoundException('No member profile for this account');
     if (input.photoUrl !== undefined && input.photoUrl !== existing.photoUrl && existing.photoUrl) {
-      await this.storage.purgeAssetByUrl(existing.photoUrl).catch(() => {});
+      await this.storage.purgeAssetByUrl(existing.photoUrl, ctx.user.id).catch(() => {});
     }
     return this.repo.updateProfileByUserId(ctx.user.id, toProfileUpdate(input));
   }

@@ -201,7 +201,7 @@ export class ReportsController {
   }
 
   @Post(':id/reset')
-  @RequirePermission('reports:manage', 'reports:review', 'reports:score')
+  @RequirePermission('reports:manage')
   async reset(
     @CurrentUser() ctx: RequestContext,
     @Param('id') id: string,

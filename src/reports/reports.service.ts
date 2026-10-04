@@ -46,6 +46,13 @@ import {
 
 const READ_PERMISSIONS = ['reports:submit', 'reports:review', 'reports:manage', 'reports:score'] as const;
 
+function isWithinJuneGracePeriod(now: Date, reportMonth: Date, activeRy: number): boolean {
+  // Grace period: July 1 to July 7 (UTC) for the June report of the previous RY
+  const isJulyGrace = now.getUTCMonth() === 6 && now.getUTCDate() <= 7;
+  const isJuneOfPreviousRy = reportMonth.getUTCMonth() === 5 && ryYearOf(reportMonth) === activeRy - 1;
+  return isJulyGrace && isJuneOfPreviousRy;
+}
+
 @Injectable()
 export class ReportsService {
   constructor(
@@ -108,7 +115,8 @@ export class ReportsService {
     const activeRy = currentRyYear(now);
     const month = new Date(`${input.month}-01T00:00:00Z`);
     const reportRy = ryYearOf(month);
-    if (reportRy !== activeRy) {
+    const isJuneGrace = isWithinJuneGracePeriod(now, month, activeRy);
+    if (reportRy !== activeRy && !isJuneGrace) {
       throw new BadRequestException({
         code: 'INVALID_REPORTING_YEAR',
         message: `Report month must be within the active reporting year (${activeRy}-${activeRy + 1})`,
@@ -160,7 +168,8 @@ export class ReportsService {
           message: 'Cannot submit a report for a future month',
         });
       }
-      if (ryYearOf(existing.month) !== activeRy) {
+      const isJuneGrace = isWithinJuneGracePeriod(now, existing.month, activeRy);
+      if (ryYearOf(existing.month) !== activeRy && !isJuneGrace) {
         throw new BadRequestException({
           code: 'INVALID_REPORTING_YEAR',
           message: 'Cannot submit a report outside the active reporting year',
@@ -338,9 +347,16 @@ export class ReportsService {
     if (!existing) throw new NotFoundException();
     await this.scope.assertCanAccessClubAny(
       access,
-      ['reports:manage', 'reports:review', 'reports:score'],
+      ['reports:manage'],
       existing.clubId,
     );
+
+    if (existing.status === 'scored' || existing.scoredAt) {
+      throw new ConflictException({
+        code: 'CANNOT_RESET_SCORED_REPORT',
+        message: 'Cannot reset an already scored report. Scoring must be modified via DSC adjustments.',
+      });
+    }
 
     const nextValues = input.clearValues !== false ? { activities: [] } : existing.values;
     const nextNotes = input.clearValues !== false ? null : existing.notes;

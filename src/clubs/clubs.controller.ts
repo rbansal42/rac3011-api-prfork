@@ -64,7 +64,7 @@ export class ClubsController {
   }
 
   @Delete(':id')
-  @RequirePermission('clubs:edit')
+  @RequirePermission('settings:manage')
   async delete(@CurrentUser() ctx: RequestContext, @Param('id') id: string) {
     await this.clubs.delete(ctx.access, id);
     return { ok: true };

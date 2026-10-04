@@ -7,6 +7,7 @@ import {
   Optional,
 } from '@nestjs/common';
 import type IORedis from 'ioredis';
+import { escapeHtml } from '../notifications/templates/html-escape';
 import { CACHE_REDIS } from '../cache/redis.provider';
 import { CodedConflictException } from '../common/errors/conflict.error';
 import { ScopeService } from '../common/scope/scope.service';
@@ -261,6 +262,15 @@ export class EventsAdminService {
   ): Promise<{ row: CheckinRow; alreadyCheckedIn: boolean }> {
     const event = await this.mustFind(eventId);
 
+    // Verify caller has permission to perform check-in for this event BEFORE processing token
+    if (event.isDistrictEvent) {
+      if (!hasGrant(ctx.access, CHECKIN) && !hasGrant(ctx.access, MANAGE)) {
+        throw new ForbiddenException('Missing events:checkin permission for district events');
+      }
+    } else if (event.clubId) {
+      await this.scope.assertCanAccessClub(ctx.access, CHECKIN, event.clubId);
+    }
+
     let memberId: string | null = null;
     let clubId: string;
     let walkInName: string | null = null;
@@ -343,15 +353,6 @@ export class EventsAdminService {
       method = 'walk_in';
     } else {
       throw new BadRequestException('Provide qrToken, memberId, or walkInName+clubId');
-    }
-
-    // Verify caller has permission to perform check-in for this event
-    if (event.isDistrictEvent) {
-      if (!hasGrant(ctx.access, CHECKIN) && !hasGrant(ctx.access, MANAGE)) {
-        throw new ForbiddenException('Missing events:checkin permission for district events');
-      }
-    } else if (event.clubId) {
-      await this.scope.assertCanAccessClub(ctx.access, CHECKIN, event.clubId);
     }
 
     if (memberId) {
@@ -512,7 +513,9 @@ export class EventsAdminService {
 
     const escapeCsv = (val: string | null | undefined) => {
       if (val === null || val === undefined) return '""';
-      const s = String(val).replace(/"/g, '""');
+      const raw = String(val);
+      const sanitized = /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw;
+      const s = sanitized.replace(/"/g, '""');
       return `"${s}"`;
     };
 
@@ -588,6 +591,15 @@ export class EventsAdminService {
   ): Promise<{ recipientCount: number; dispatchedCount: number }> {
     const event = await this.mustFind(eventId);
 
+    // Permission check: dispatching tickets requires MANAGE permission
+    if (event.isDistrictEvent) {
+      if (!hasGrant(ctx.access, MANAGE) && !ctx.access.isSuperAdmin) {
+        throw new ForbiddenException('Missing events:manage permission to dispatch tickets');
+      }
+    } else if (event.clubId) {
+      await this.scope.assertCanAccessClub(ctx.access, MANAGE, event.clubId);
+    }
+
     interface Recipient {
       email: string;
       fullName: string;
@@ -607,6 +619,9 @@ export class EventsAdminService {
 
     if (dto.audience === 'custom_emails') {
       const emails = dto.customEmails ?? [];
+      if (emails.length > 50) {
+        throw new BadRequestException('Custom emails list capped at 50 per dispatch');
+      }
       for (const email of emails) {
         const clean = email.toLowerCase().trim();
         if (!clean) continue;
@@ -741,39 +756,46 @@ export class EventsAdminService {
           const { token } = signCheckinToken(event.id, pseudoMid);
           const ticketUrl = `${baseUrl}/pass/${token}`;
 
+          const escapedTitle = escapeHtml(event.title);
+          const escapedFullName = escapeHtml(r.fullName);
+          const escapedClubName = r.clubName ? escapeHtml(r.clubName) : '';
+          const escapedLocation = event.location ? escapeHtml(event.location) : '';
+          const escapedEventDate = escapeHtml(eventDate);
+          const escapedTicketUrl = escapeHtml(ticketUrl);
+
           const subject = `Your Official Entry Ticket: ${event.title} • Rotaract District Organization 3011`;
           const html = `
             <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; background: #FFFFFF; border-radius: 16px; border: 1.5px solid #F1F5F9; overflow: hidden; box-shadow: 0 8px 30px rgba(0,0,0,0.06);">
               <div style="background: linear-gradient(135deg, #123499 0%, #0C2470 100%); padding: 32px 24px; text-align: center; color: #FFFFFF;">
                 <p style="margin: 0 0 6px 0; font-size: 11px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; color: rgba(255,255,255,0.8);">ROTARACT DISTRICT ORGANIZATION 3011 • OFFICIAL EVENT PASS</p>
-                <h1 style="margin: 0; font-size: 24px; font-weight: 900; line-height: 1.25; color: #FFFFFF;">${event.title}</h1>
+                <h1 style="margin: 0; font-size: 24px; font-weight: 900; line-height: 1.25; color: #FFFFFF;">${escapedTitle}</h1>
               </div>
               <div style="padding: 28px 24px;">
                 <p style="margin: 0 0 16px 0; font-size: 15px; color: #334155; line-height: 1.5;">
-                  Dear <strong>${r.fullName}</strong>${r.clubName ? ` (${r.clubName})` : ''},
+                  Dear <strong>${escapedFullName}</strong>${escapedClubName ? ` (${escapedClubName})` : ''},
                 </p>
                 <p style="margin: 0 0 20px 0; font-size: 14px; color: #475569; line-height: 1.5;">
-                  Your secure dynamic entry pass for <strong>${event.title}</strong> is ready. Please present this pass or the digital QR code at the event gate for instant check-in.
+                  Your secure dynamic entry pass for <strong>${escapedTitle}</strong> is ready. Please present this pass or the digital QR code at the event gate for instant check-in.
                 </p>
                 <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; padding: 16px; margin-bottom: 24px;">
                   <table style="width: 100%; border-collapse: collapse; font-size: 13.5px; color: #1E293B;">
                     <tr>
                       <td style="padding: 6px 0; font-weight: 700; color: #64748B; width: 90px;">Date & Time:</td>
-                      <td style="padding: 6px 0; font-weight: 800;">${eventDate} IST</td>
+                      <td style="padding: 6px 0; font-weight: 800;">${escapedEventDate} IST</td>
                     </tr>
-                    ${event.location ? `
+                    ${escapedLocation ? `
                     <tr>
                       <td style="padding: 6px 0; font-weight: 700; color: #64748B;">Venue:</td>
-                      <td style="padding: 6px 0; font-weight: 800;">${event.location}</td>
+                      <td style="padding: 6px 0; font-weight: 800;">${escapedLocation}</td>
                     </tr>` : ''}
                     <tr>
                       <td style="padding: 6px 0; font-weight: 700; color: #64748B;">Attendee:</td>
-                      <td style="padding: 6px 0; font-weight: 800;">${r.fullName}</td>
+                      <td style="padding: 6px 0; font-weight: 800;">${escapedFullName}</td>
                     </tr>
                   </table>
                 </div>
                 <div style="text-align: center; margin: 28px 0;">
-                  <a href="${ticketUrl}" style="background: #D81B60; color: #FFFFFF; font-weight: 800; font-size: 15px; padding: 14px 28px; border-radius: 12px; text-decoration: none; display: inline-block; box-shadow: 0 6px 20px rgba(216, 27, 96, 0.35);">
+                  <a href="${escapedTicketUrl}" style="background: #D81B60; color: #FFFFFF; font-weight: 800; font-size: 15px; padding: 14px 28px; border-radius: 12px; text-decoration: none; display: inline-block; box-shadow: 0 6px 20px rgba(216, 27, 96, 0.35);">
                     Open Digital Entry Pass
                   </a>
                 </div>

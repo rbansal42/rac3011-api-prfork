@@ -3,9 +3,9 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient({
   datasources: {
     db: {
-      url: 'postgresql://rac3011:pVV0bKFfDruFvjB2pNTD1Qb2oUsTzNP@127.0.0.1:5434/rac3011'
-    }
-  }
+      url: process.env.DATABASE_URL,
+    },
+  },
 });
 
 async function inspectClubsAndZones() {

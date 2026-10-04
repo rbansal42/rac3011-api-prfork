@@ -22,18 +22,19 @@ export class EventsRepository {
 
   findInRange(from: Date | undefined, to: Date | undefined): Promise<PublicEventRow[]> {
     const where: Prisma.EventWhereInput = {
+      isDistrictEvent: true,
       startsAt: (from || to) ? { gte: from, lte: to } : undefined,
     };
     return this.prisma.event.findMany({ where, select: SELECT, orderBy: { startsAt: 'asc' } });
   }
 
   findBySlug(slug: string): Promise<PublicEventRow | null> {
-    return this.prisma.event.findFirst({ where: { slug }, select: SELECT });
+    return this.prisma.event.findFirst({ where: { slug, isDistrictEvent: true }, select: SELECT });
   }
 
   findAllUpcoming(): Promise<PublicEventRow[]> {
     return this.prisma.event.findMany({
-      where: { startsAt: { gte: new Date() } },
+      where: { startsAt: { gte: new Date() }, isDistrictEvent: true },
       select: SELECT,
       orderBy: { startsAt: 'asc' },
     });

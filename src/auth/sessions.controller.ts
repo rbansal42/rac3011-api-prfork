@@ -1,6 +1,7 @@
 import {
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   NotFoundException,
   Param,
@@ -49,14 +50,21 @@ export class SessionsController {
 
   @Get()
   @RequirePermission('roles:manage', 'subdomain:ride:manage', 'ride:manage', 'ride:delegates:manage')
-  async listActiveSessions(@Req() req: Request, @Query('scope') scope?: string) {
+  async listActiveSessions(
+    @Req() req: Request,
+    @CurrentUser() ctx: RequestContext,
+    @Query('scope') scope?: string,
+  ) {
     const currentSession = await this.sessionContext.fromRequest(req);
     const currentSessionId = currentSession?.sessionId ?? null;
+
+    const hasRolesManage = ctx.access.isSuperAdmin || (ctx.access.grants['roles:manage'] ?? []).length > 0;
+    const effectiveScope = hasRolesManage ? scope : 'ride';
 
     const now = new Date();
 
     let rideUserIds: Set<string> | null = null;
-    if (scope === 'ride') {
+    if (effectiveScope === 'ride') {
       const [rideRoleUsers, rideParticipants] = await Promise.all([
         this.prisma.userRole.findMany({
           where: {
@@ -198,12 +206,25 @@ export class SessionsController {
     @CurrentUser() ctx: RequestContext,
     @Param('id') id: string,
   ): Promise<{ success: boolean }> {
+    const hasRolesManage = ctx.access.isSuperAdmin || (ctx.access.grants['roles:manage'] ?? []).length > 0;
     const existing = await this.prisma.session.findUnique({
       where: { id },
       select: { id: true, userId: true, ipAddress: true, userAgent: true },
     });
 
     if (existing) {
+      if (!hasRolesManage) {
+        const isRideUser = await this.prisma.userRole.findFirst({
+          where: {
+            userId: existing.userId,
+            role: { key: { in: ['participant', 'ride_admin', 'project_admin:ride'] } },
+          },
+        });
+        if (!isRideUser) {
+          throw new ForbiddenException('Cannot revoke session for district officer');
+        }
+      }
+
       await this.prisma.session.delete({ where: { id } });
 
       await this.audit.record({
@@ -236,6 +257,19 @@ export class SessionsController {
     @CurrentUser() ctx: RequestContext,
     @Param('userId') userId: string,
   ): Promise<{ count: number }> {
+    const hasRolesManage = ctx.access.isSuperAdmin || (ctx.access.grants['roles:manage'] ?? []).length > 0;
+    if (!hasRolesManage) {
+      const isRideUser = await this.prisma.userRole.findFirst({
+        where: {
+          userId,
+          role: { key: { in: ['participant', 'ride_admin', 'project_admin:ride'] } },
+        },
+      });
+      if (!isRideUser) {
+        throw new ForbiddenException('Cannot revoke sessions for district officer');
+      }
+    }
+
     const res = await this.prisma.session.deleteMany({
       where: { userId },
     });
@@ -265,6 +299,8 @@ export class SessionsController {
     @CurrentUser() ctx: RequestContext,
     @Query('scope') scope?: string,
   ): Promise<{ count: number }> {
+    const hasRolesManage = ctx.access.isSuperAdmin || (ctx.access.grants['roles:manage'] ?? []).length > 0;
+    const effectiveScope = hasRolesManage ? scope : 'ride';
     const currentSession = await this.sessionContext.fromRequest(req);
     const currentSessionId = currentSession?.sessionId;
 
@@ -273,7 +309,7 @@ export class SessionsController {
       whereClause.id = { not: currentSessionId };
     }
 
-    if (scope === 'ride') {
+    if (effectiveScope === 'ride') {
       const [rideRoleUsers, rideParticipants] = await Promise.all([
         this.prisma.userRole.findMany({
           where: {
@@ -313,7 +349,7 @@ export class SessionsController {
       action: 'auth.all_sessions_revoked',
       resourceType: 'session',
       resourceId: null,
-      after: { revokedCount: totalCount, preservedSessionId: currentSessionId, scope },
+      after: { revokedCount: totalCount, preservedSessionId: currentSessionId, scope: effectiveScope },
     });
 
     return { count: totalCount };

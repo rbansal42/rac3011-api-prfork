@@ -68,26 +68,7 @@ export class MeRepository {
       });
     }
 
-    // Sync to Past DRRs
-    if (data.photoUrl !== undefined || data.fullName || data.bio !== undefined) {
-      const pastDrrUpdateData: Prisma.PastDrrUpdateInput = {};
-      if (data.photoUrl !== undefined) pastDrrUpdateData.photoUrl = data.photoUrl;
-      if (data.fullName) pastDrrUpdateData.name = data.fullName;
-      if (data.bio !== undefined) pastDrrUpdateData.bio = data.bio;
 
-      if (Object.keys(pastDrrUpdateData).length > 0 && updated.fullName) {
-        const cleanName = updated.fullName.replace(/^(Rtn\.?\s*|Rtr\.?\s*|PDRR\s*|DRR\s*)+/gi, '').trim();
-        await this.prisma.pastDrr.updateMany({
-          where: {
-            OR: [
-              { name: { contains: cleanName, mode: 'insensitive' } },
-              { slug: { contains: cleanName.toLowerCase().replace(/[^a-z0-9]+/g, '-'), mode: 'insensitive' } },
-            ],
-          },
-          data: pastDrrUpdateData,
-        });
-      }
-    }
 
     return updated;
   }

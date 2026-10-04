@@ -1,6 +1,6 @@
 import { env } from './env';
 
-const APEXES = ['rotaract3011.org', 'rotar3011.org'];
+const APEXES = ['rotaract3011.org'];
 
 // The site's own hostnames are always allowed. WEB_ORIGINS drifted to a testing-only
 // list once and silently blocked every production origin, taking the whole site down.

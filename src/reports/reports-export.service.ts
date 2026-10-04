@@ -561,7 +561,10 @@ export class ReportsExportService {
       .map((row) =>
         row
           .map((cell) => {
-            const escaped = String(cell ?? '').replace(/"/g, '""');
+            const raw = String(cell ?? '');
+            // Prevent CSV formula injection (DDE / Excel / Calc formula execution)
+            const safe = /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw;
+            const escaped = safe.replace(/"/g, '""');
             return `"${escaped}"`;
           })
           .join(','),

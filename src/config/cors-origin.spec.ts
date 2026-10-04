@@ -7,15 +7,14 @@ describe('isAllowedOrigin', () => {
     expect(isAllowedOrigin('https://www.rotaract3011.org')).toBe(true);
     expect(isAllowedOrigin('https://mission3011.rotaract3011.org')).toBe(true);
     expect(isAllowedOrigin('https://testing.careerbridge.rotaract3011.org')).toBe(true);
-    expect(isAllowedOrigin('https://rotar3011.org')).toBe(true);
-    expect(isAllowedOrigin('https://ride.rotar3011.org')).toBe(true);
-    expect(isAllowedOrigin('https://delhimerijan.rotar3011.org')).toBe(true);
   });
 
   it('rejects lookalike hosts that merely end with the apex string', () => {
     expect(isAllowedOrigin('https://notrotaract3011.org')).toBe(false);
     expect(isAllowedOrigin('https://rotaract3011.org.evil.com')).toBe(false);
     expect(isAllowedOrigin('https://evilrotaract3011.org')).toBe(false);
+    expect(isAllowedOrigin('https://rotar3011.org')).toBe(false);
+    expect(isAllowedOrigin('https://ride.rotar3011.org')).toBe(false);
   });
 
   it('rejects plaintext http and malformed origins', () => {

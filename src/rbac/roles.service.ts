@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException, Optional } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { hashPassword } from '../auth/legacy-password';
 import { env } from '../config/env';
 import { AuditService } from '../audit/audit.service';
@@ -133,10 +133,25 @@ export class RolesService {
     return this.repo.listUsersDirectory(q);
   }
 
+  private async isActorSuperAdmin(actorId: string): Promise<boolean> {
+    if (!this.prisma) return false;
+    const grant = await this.prisma.userRole.findFirst({
+      where: {
+        userId: actorId,
+        role: { key: 'super_admin' },
+      },
+    });
+    return !!grant;
+  }
+
   async grantUserRole(actorId: string, input: CreateUserRoleInput): Promise<UserRoleRecord> {
     if (!(await this.repo.userExists(input.userId))) throw new NotFoundException('User not found');
     const role = await this.repo.findRole(input.roleId);
     if (!role) throw new NotFoundException('Role not found');
+    if (role.key === 'super_admin') {
+      const isSuper = await this.isActorSuperAdmin(actorId);
+      if (!isSuper) throw new ForbiddenException('Only a super admin can grant the super admin role');
+    }
     if (role.scopeType !== input.scopeType) {
       throw new BadRequestException(
         `Role "${role.key}" must be granted with scope ${role.scopeType}`,
@@ -274,8 +289,13 @@ export class RolesService {
     const grant = await this.repo.findUserRole(id);
     if (!grant) throw new NotFoundException('Grant not found');
 
+    const role = await this.repo.findRole(grant.roleId);
+    if (role?.key === 'super_admin') {
+      const isSuper = await this.isActorSuperAdmin(actorId);
+      if (!isSuper) throw new ForbiddenException('Only a super admin can revoke the super admin role');
+    }
+
     if (this.prisma && grant.scopeType === 'club' && grant.scopeId) {
-      const role = await this.repo.findRole(grant.roleId);
       const user = await this.prisma.user.findUnique({
         where: { id: grant.userId },
         include: { profile: true },
@@ -329,6 +349,11 @@ export class RolesService {
   }
 
   async createUser(actorId: string, input: CreateAdminUserInput) {
+    if (input.roleKey === 'super_admin') {
+      const isSuper = await this.isActorSuperAdmin(actorId);
+      if (!isSuper) throw new ForbiddenException('Only a super admin can create another super admin');
+    }
+
     const passwordHash = await hashPassword(input.password || 'Rac3011#2026');
     const result = await this.repo.createUserWithAccountAndRole({
       name: input.name,
@@ -371,6 +396,13 @@ export class RolesService {
   }
 
   async updateUser(actorId: string, targetUserId: string, input: UpdateAdminUserInput) {
+    const targetRoles = await this.repo.listUserRoles(targetUserId);
+    const targetIsSuper = targetRoles.some((r) => r.roleKey === 'super_admin');
+    if (targetIsSuper) {
+      const isSuper = await this.isActorSuperAdmin(actorId);
+      if (!isSuper) throw new ForbiddenException('Only a super admin can modify a super admin account');
+    }
+
     let passwordHash: string | undefined;
     if (input.password) {
       passwordHash = await hashPassword(input.password);
@@ -404,6 +436,14 @@ export class RolesService {
   async deleteUser(actorId: string, targetUserId: string) {
     const existing = await this.repo.findUser(targetUserId);
     if (!existing) throw new NotFoundException('User not found');
+
+    const targetRoles = await this.repo.listUserRoles(targetUserId);
+    const targetIsSuper = targetRoles.some((r) => r.roleKey === 'super_admin');
+    if (targetIsSuper) {
+      const isSuper = await this.isActorSuperAdmin(actorId);
+      if (!isSuper) throw new ForbiddenException('Only a super admin can delete a super admin account');
+    }
+
     await this.repo.deleteUser(targetUserId);
     await this.audit.record({
       actorId,

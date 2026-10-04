@@ -77,6 +77,9 @@ export class ClubsService {
   ): Promise<ClubWithRelations> {
     await this.scope.assertCanAccessClub(access, 'clubs:edit', id);
     if (!(await this.repo.exists(id))) throw new NotFoundException();
+    if (input.zoneId !== undefined || input.zone !== undefined) {
+      await this.scope.assertCanAccessClub(access, 'settings:manage', id);
+    }
     let resolvedZone = input.zone;
     if (input.zoneId && resolvedZone === undefined) {
       const zones = await this.repo.listZones();
@@ -87,7 +90,7 @@ export class ClubsService {
   }
 
   async delete(access: ResolvedAccess, id: string): Promise<void> {
-    await this.scope.assertCanAccessClub(access, 'clubs:edit', id);
+    await this.scope.assertCanAccessClub(access, 'settings:manage', id);
     if (!(await this.repo.exists(id))) throw new NotFoundException();
     await this.repo.delete(id);
   }

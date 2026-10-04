@@ -150,12 +150,18 @@ export class ShowcaseAdminService {
     const existing = await this.repo.findById(id);
     if (!existing) throw new NotFoundException();
 
-    const canPublish = this.hasPublishGrant(ctx.access);
-    if (!canPublish) {
-      const leadClubId = this.leadClubId(existing);
-      await this.scope.assertCanAccessClub(ctx.access, 'showcase:submit', leadClubId);
-      if (existing.submittedById !== ctx.user.id && !ctx.access.isSuperAdmin) {
-        throw new ForbiddenException('Not authorized to delete this showcase post');
+    const leadClubId = this.leadClubId(existing);
+    if (!ctx.access.isSuperAdmin) {
+      const hasDistrictPublish =
+        this.scope.hasDistrictScope(ctx.access, 'showcase:publish') ||
+        this.scope.hasDistrictScope(ctx.access, 'public_content:manage');
+
+      if (!hasDistrictPublish) {
+        await this.scope.assertCanAccessClub(ctx.access, 'showcase:submit', leadClubId);
+        const canPublishInScope = await this.scope.canAccessClub(ctx.access, 'showcase:publish', leadClubId);
+        if (!canPublishInScope && existing.submittedById !== ctx.user.id) {
+          throw new ForbiddenException('Not authorized to delete this showcase post');
+        }
       }
     }
 

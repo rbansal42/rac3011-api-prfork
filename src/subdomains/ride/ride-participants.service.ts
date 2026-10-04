@@ -324,13 +324,15 @@ export class RideParticipantsService {
       }
     }
 
-    return this.prisma.rideAnnouncement.findMany({
+    const announcements = await this.prisma.rideAnnouncement.findMany({
       where: {
         OR: orClauses,
       },
       orderBy: { createdAt: 'desc' },
       take: 50,
     });
+
+    return announcements.map(({ targetEmails, ...rest }) => rest);
   }
 
   async getDistricts(): Promise<string[]> {

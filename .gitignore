@@ -13,11 +13,9 @@ scripts/out/
 *.cmd
 *.key
 *.pem
-*HANDOFF*
-*handoff*
 *.xlsx
 *.xls
 data/*.xlsx
-*CONTEXT*
-*context*
 backlogs_data/
+CONTEXT.md
+PROJECT_CONTEXT_HANDOFF.md

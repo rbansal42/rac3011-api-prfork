@@ -42,15 +42,4 @@ export class RideResourcesController {
   async delete(@CurrentUser() ctx: RequestContext, @Param('id') id: string): Promise<void> {
     await this.service.delete(ctx, id);
   }
-
-  @Get('public')
-  @Public()
-  async listPublic(
-    @Query('email') email?: string,
-    @Query('clubName') clubName?: string,
-    @Query('district') district?: string,
-  ) {
-    const items = await this.service.listForParticipant(email, clubName, district);
-    return { items };
-  }
 }

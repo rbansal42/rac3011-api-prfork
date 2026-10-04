@@ -154,12 +154,15 @@ export class StorageService {
     await this.repo.deleteFile(id);
   }
 
-  async purgeAssetByUrl(urlOrPath: string): Promise<void> {
+  async purgeAssetByUrl(urlOrPath: string, expectedUserId?: string): Promise<void> {
     if (!urlOrPath) return;
 
     // 1. Check if tracked in files database table (UploadThing / R2)
     const file = await this.repo.findFileByUrlOrKey(urlOrPath);
     if (file) {
+      if (expectedUserId && file.uploadedById !== expectedUserId) {
+        return;
+      }
       try {
         await this.port.delete(file.id);
       } catch {
@@ -169,7 +172,12 @@ export class StorageService {
       return;
     }
 
-    // 2. Direct UploadThing URL or key not in DB
+    // If caller specified an expected user, do not delete untracked/unverified arbitrary paths
+    if (expectedUserId) {
+      return;
+    }
+
+    // 2. Direct UploadThing URL or key not in DB (internal system cleanup only)
     if (urlOrPath.includes('/f/') || urlOrPath.startsWith('permanent:') || urlOrPath.startsWith('dynamic:')) {
       try {
         await this.port.delete(urlOrPath);

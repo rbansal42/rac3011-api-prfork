@@ -108,21 +108,12 @@ export class RideDelegationsService extends RideBaseManagerService {
 
     // Cross-portal synchronization: Propagate host assignment to DMJ participants
     const primaryHost = input.hosts[0];
-    let targetPids: string[] = [];
-    if (input.participantIds && input.participantIds.length > 0) {
-      targetPids = input.participantIds;
-    } else {
-      targetPids = await this.repo.findParticipantIdsByDistrict(existing.visitingDistrict);
-    }
-
-    if (targetPids.length > 0 && primaryHost) {
-      await this.repo.updateParticipantsHost(targetPids, {
+    if (input.participantIds && input.participantIds.length > 0 && primaryHost) {
+      await this.repo.updateParticipantsHost(input.participantIds, {
         hostClubId: primaryHost.clubId,
         hostFamilyName: primaryHost.hostFamilyName || undefined,
         hostFamilyPhone: primaryHost.hostFamilyPhone || undefined,
         hostAddress: primaryHost.hostAddress || undefined,
-        status: 'confirmed',
-        approvalStatus: 'approved',
       });
     }
 

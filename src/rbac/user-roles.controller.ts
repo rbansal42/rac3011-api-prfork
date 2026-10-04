@@ -30,13 +30,13 @@ export class UserRolesController {
   }
 
   @Post('create-user')
-  @RequirePermission('roles:manage', 'subdomain:ride:manage', 'ride:manage')
+  @RequirePermission('roles:manage')
   createUser(@CurrentUser() ctx: RequestContext, @Body() dto: CreateAdminUserDto) {
     return this.roles.createUser(ctx.user.id, dto);
   }
 
   @Patch('users/:id')
-  @RequirePermission('roles:manage', 'subdomain:ride:manage', 'ride:manage')
+  @RequirePermission('roles:manage')
   updateUser(
     @CurrentUser() ctx: RequestContext,
     @Param('id') id: string,
@@ -46,7 +46,7 @@ export class UserRolesController {
   }
 
   @Delete('users/:id')
-  @RequirePermission('roles:manage', 'subdomain:ride:manage', 'ride:manage')
+  @RequirePermission('roles:manage')
   deleteUser(@CurrentUser() ctx: RequestContext, @Param('id') id: string) {
     return this.roles.deleteUser(ctx.user.id, id);
   }
