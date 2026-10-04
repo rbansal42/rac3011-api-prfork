@@ -36,7 +36,10 @@ import { RideFormsService } from './ride-forms.service';
     PublicModule,
     PointsModule,
     AuditModule,
-    ThrottlerModule.forRoot([{ name: 'ride_auth', ttl: 60000, limit: 10 }]),
+    ThrottlerModule.forRoot([
+      { name: 'default', ttl: 60000, limit: 60 },
+      { name: 'ride_auth', ttl: 60000, limit: 10 },
+    ]),
   ],
   controllers: [
     RideAuthController,

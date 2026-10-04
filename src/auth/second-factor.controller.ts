@@ -1,5 +1,6 @@
-import { Body, Controller, Post, Req, Res } from '@nestjs/common';
+import { Body, Controller, Post, Req, Res, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { SecondFactorStage } from '../common/decorators/access.decorators';
@@ -26,6 +27,8 @@ export class SecondFactorController {
 
   @Post('resend')
   @SecondFactorStage()
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 3, ttl: 300000 } })
   async resend(@CurrentUser() ctx: RequestContext): Promise<{ status: 'sent' }> {
     await this.secondFactor.resend(ctx.user.email);
     return { status: 'sent' };

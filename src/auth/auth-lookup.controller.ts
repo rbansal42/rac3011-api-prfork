@@ -1,5 +1,6 @@
-import { BadRequestException, Controller, Get, Query } from '@nestjs/common';
+import { BadRequestException, Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { Public } from '../common/decorators/access.decorators';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -10,6 +11,8 @@ export class AuthLookupController {
 
   @Get('resolve')
   @Public()
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   async resolve(@Query('identifier') rawIdentifier?: string): Promise<{ email: string }> {
     if (!rawIdentifier || !rawIdentifier.trim()) {
       throw new BadRequestException('Identifier is required');

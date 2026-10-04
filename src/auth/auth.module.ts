@@ -14,10 +14,12 @@ import { SessionContextAdapter } from './session-context.adapter';
 import { TrustedDevicesController } from './trusted-devices.controller';
 import { TrustedDevicesService } from './trusted-devices.service';
 import { SessionsController } from './sessions.controller';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { RideModule } from '../subdomains/ride/ride.module';
 
 @Module({
   imports: [
+    ThrottlerModule.forRoot([{ name: 'default', ttl: 60000, limit: 100 }]),
     RideModule,
     BetterAuthModule.forRootAsync({
       disableGlobalAuthGuard: true,
