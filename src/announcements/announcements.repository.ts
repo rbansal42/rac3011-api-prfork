@@ -238,7 +238,10 @@ export class AnnouncementsRepository {
       });
   }
 
-  async findUserIdsForMemberIds(memberIds: string[]): Promise<string[]> {
+  async findUserIdsForMemberIds(
+    memberIds: string[],
+    allowedClubIds?: string[],
+  ): Promise<string[]> {
     if (memberIds.length === 0) return [];
     const profiles = await this.prisma.memberProfile.findMany({
       where: {
@@ -249,6 +252,7 @@ export class AnnouncementsRepository {
           { fullName: { in: memberIds, mode: 'insensitive' } },
         ],
         status: 'approved',
+        ...(allowedClubIds && allowedClubIds.length > 0 ? { clubId: { in: allowedClubIds } } : {}),
       },
       select: { userId: true },
     });

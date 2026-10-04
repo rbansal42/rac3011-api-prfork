@@ -43,7 +43,13 @@ export class AnnouncementsService {
       createdById: ctx.user.id,
     });
 
-    const userIds = await this.resolveAudience(input.audience);
+    const allowed = await this.scope.clubFilterAny(ctx.access, [
+      'announcements:send',
+      'announcements:send_all',
+    ]);
+    const allowedClubIds = 'clubIds' in allowed ? allowed.clubIds : undefined;
+
+    const userIds = await this.resolveAudience(input.audience, allowedClubIds);
     if (userIds.size > 0) {
       await this.notifications.notify({
         template: 'announcement',
@@ -56,7 +62,10 @@ export class AnnouncementsService {
     return { ...created, sentAt: new Date(), recipientCount: userIds.size };
   }
 
-  private async resolveAudience(audience: AnnouncementAudience): Promise<Set<string>> {
+  private async resolveAudience(
+    audience: AnnouncementAudience,
+    allowedClubIds?: string[],
+  ): Promise<Set<string>> {
     const result = new Set<string>();
     if (audience.roleKeys?.length) {
       const candidates = await this.repo.findRoleHolderCandidates(audience.roleKeys);
@@ -81,7 +90,7 @@ export class AnnouncementsService {
           ),
         ),
       ];
-      for (const userId of await this.repo.findUserIdsForMemberIds(normalized)) {
+      for (const userId of await this.repo.findUserIdsForMemberIds(normalized, allowedClubIds)) {
         result.add(userId);
       }
     }

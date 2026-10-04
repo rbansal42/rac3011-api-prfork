@@ -1,9 +1,10 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException, Optional } from '@nestjs/common';
+import { randomBytes } from 'crypto';
 import { hashPassword } from '../auth/legacy-password';
 import { env } from '../config/env';
 import { AuditService } from '../audit/audit.service';
 import { CodedConflictException } from '../common/errors/conflict.error';
-import type { ScopeKind } from '../common/types/access';
+import type { RequestContext, ScopeKind } from '../common/types/access';
 import { isPermissionKey } from '../common/types/permission-keys';
 import { EmailProviderPool } from '../notifications/email/email-provider-pool.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -129,8 +130,14 @@ export class RolesService {
     return this.repo.listUserRoles(userId);
   }
 
-  listUsersDirectory(q?: string) {
-    return this.repo.listUsersDirectory(q);
+  listUsersDirectory(ctx?: RequestContext, q?: string) {
+    if (!ctx) return this.repo.listUsersDirectory(q);
+    const isSuperAdmin = ctx.access.isSuperAdmin;
+    const hasDistrictRolesManage =
+      isSuperAdmin ||
+      ctx.access.roles.some((r) => r.roleKey === 'roles:manage' && (!r.scope || r.scope.type === 'none'));
+    const isRideOnly = !hasDistrictRolesManage;
+    return this.repo.listUsersDirectory(q, isRideOnly);
   }
 
   private async isActorSuperAdmin(actorId: string): Promise<boolean> {
@@ -354,7 +361,8 @@ export class RolesService {
       if (!isSuper) throw new ForbiddenException('Only a super admin can create another super admin');
     }
 
-    const passwordHash = await hashPassword(input.password || 'Rac3011#2026');
+    const rawPassword = input.password || ('Rotaract@' + randomBytes(8).toString('base64url') + '!26');
+    const passwordHash = await hashPassword(rawPassword);
     const result = await this.repo.createUserWithAccountAndRole({
       name: input.name,
       email: input.email,

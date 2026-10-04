@@ -45,6 +45,8 @@ export class DirectoryService {
       throw new NotFoundException('Member not found');
     }
 
+    const cleanReason = reason ? reason.trim().slice(0, 300) : '';
+
     if (targetMember.user?.email || targetMember.userId) {
       await this.notifications.notify({
         template: 'announcement',
@@ -56,7 +58,7 @@ export class DirectoryService {
         ],
         data: {
           title: `Contact details requested by ${currentUser.name}`,
-          body: `Hi ${targetMember.fullName},\n\n${currentUser.name} (${currentUser.email}) has requested your contact number via the Rotaract 3011 Directory.\n\n${reason ? `Message / Reason: "${reason}"\n\n` : ''}You may reach out to them directly at ${currentUser.email}.`,
+          body: `Hi ${targetMember.fullName},\n\n${currentUser.name} (${currentUser.email}) has requested your contact number via the Rotaract 3011 Directory.\n\n${cleanReason ? `Message / Reason: "${cleanReason}"\n\n` : ''}You may reach out to them directly at ${currentUser.email}.`,
           senderName: 'Rotaract 3011 Portal',
         },
         channels: ['email'],

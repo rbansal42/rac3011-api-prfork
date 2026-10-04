@@ -86,7 +86,6 @@ import { RideModule } from '../subdomains/ride/ride.module';
               }
             }
             const resetUrl = `${webOrigin}/portal/reset-password?token=${encodeURIComponent(resolvedToken)}`;
-            console.log(`[AUTH] Dispatching password reset email to: ${email}, URL: ${resetUrl}`);
             try {
               await notifications.notify({
                 template: 'password-reset',

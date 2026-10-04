@@ -250,4 +250,26 @@ export class MembersRepository {
       data: { password: passwordHash },
     });
   }
+
+  async isPrivilegedUser(userId: string): Promise<boolean> {
+    const roles = await this.prisma.userRole.findMany({
+      where: { userId },
+      include: { role: true },
+    });
+    return roles.some(
+      (ur) =>
+        ur.role.key === 'super_admin' ||
+        ur.role.key === 'superadmin' ||
+        ur.role.key === 'district_admin' ||
+        ur.role.key === 'drr' ||
+        ur.role.key === 'district_officer' ||
+        ur.role.key === 'admin',
+    );
+  }
+
+  async revokeSessions(userId: string): Promise<void> {
+    await this.prisma.session.deleteMany({
+      where: { userId },
+    });
+  }
 }

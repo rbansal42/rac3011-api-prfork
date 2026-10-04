@@ -180,19 +180,26 @@ export class RbacRepository {
     return true;
   }
 
-  async listUsersDirectory(q?: string) {
+  async listUsersDirectory(q?: string, isRideOnly = false) {
     const filter = q?.trim();
+    const where: any = {};
+    if (filter) {
+      where.OR = [
+        { name: { contains: filter, mode: 'insensitive' } },
+        { email: { contains: filter, mode: 'insensitive' } },
+        { profile: { fullName: { contains: filter, mode: 'insensitive' } } },
+        { profile: { rotaryId: { contains: filter, mode: 'insensitive' } } },
+      ];
+    }
+    if (isRideOnly) {
+      where.userRoles = {
+        some: {
+          role: { key: { in: ['participant', 'ride_admin', 'project_admin:ride'] } },
+        },
+      };
+    }
     const users = await this.prisma.user.findMany({
-      where: filter
-        ? {
-            OR: [
-              { name: { contains: filter, mode: 'insensitive' } },
-              { email: { contains: filter, mode: 'insensitive' } },
-              { profile: { fullName: { contains: filter, mode: 'insensitive' } } },
-              { profile: { rotaryId: { contains: filter, mode: 'insensitive' } } },
-            ],
-          }
-        : {},
+      where,
       include: {
         profile: {
           include: {

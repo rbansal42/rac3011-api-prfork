@@ -18,8 +18,8 @@ export class UserRolesController {
 
   @Get('directory')
   @RequirePermission('roles:manage', 'subdomain:ride:manage', 'ride:manage')
-  directory(@Query('q') q?: string) {
-    return this.roles.listUsersDirectory(q);
+  directory(@CurrentUser() ctx: RequestContext, @Query('q') q?: string) {
+    return this.roles.listUsersDirectory(ctx, q);
   }
 
   @Get()

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, type OnModuleInit } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException, type OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import type { RequestContext } from '../common/types/access';
 import type { CreateFormInput } from './dto/create-form.dto';
@@ -179,7 +179,52 @@ export class FormsService implements OnModuleInit {
     return form;
   }
 
+  isRideForm(form: any): boolean {
+    if (!form) return false;
+    const surface = (form.targetSurface || '').toLowerCase();
+    const cat = (form.category || '').toLowerCase();
+    const slug = (form.slug || '').toLowerCase();
+    const title = (form.title || '').toLowerCase();
+    return (
+      surface === 'dmj' ||
+      cat.includes('ride') ||
+      slug.includes('ride') ||
+      slug.includes('dmj') ||
+      title.includes('ride') ||
+      title.includes('delhi meri jaan')
+    );
+  }
+
+  assertCanManageForm(ctx: RequestContext, form?: any): void {
+    if (ctx.access.isSuperAdmin) return;
+    const hasDistrictManage = ctx.access.roles.some(
+      (r) =>
+        (r.roleKey === 'forms:manage' || r.roleKey === 'roles:manage') &&
+        (!r.scope || r.scope.type === 'none'),
+    );
+    if (hasDistrictManage) return;
+
+    // Check if user has RIDE project admin scope
+    const hasRideManage = ctx.access.roles.some(
+      (r) =>
+        r.roleKey === 'project_admin:ride' ||
+        r.roleKey === 'subdomain:ride:manage' ||
+        r.roleKey === 'ride:manage' ||
+        (r.roleKey === 'forms:manage' && r.scope?.type === 'project' && r.scope?.id === 'ride'),
+    );
+
+    if (hasRideManage) {
+      if (form && !this.isRideForm(form)) {
+        throw new ForbiddenException('You only have permission to manage RIDE forms');
+      }
+      return;
+    }
+
+    throw new ForbiddenException('Insufficient permissions to manage forms');
+  }
+
   async createForm(ctx: RequestContext, dto: CreateFormInput) {
+    this.assertCanManageForm(ctx, dto);
     const existing = await this.customForm.findUnique({
       where: { slug: dto.slug },
     });
@@ -198,6 +243,7 @@ export class FormsService implements OnModuleInit {
   async updateForm(ctx: RequestContext, id: string, dto: UpdateFormInput) {
     const form = await this.customForm.findUnique({ where: { id } });
     if (!form) throw new NotFoundException('Form not found');
+    this.assertCanManageForm(ctx, form);
 
     if (dto.slug && dto.slug !== form.slug) {
       const collision = await this.customForm.findUnique({ where: { slug: dto.slug } });
@@ -213,6 +259,7 @@ export class FormsService implements OnModuleInit {
   async deleteForm(ctx: RequestContext, id: string) {
     const form = await this.customForm.findUnique({ where: { id } });
     if (!form) throw new NotFoundException('Form not found');
+    this.assertCanManageForm(ctx, form);
     await this.customFormSubmission.deleteMany({
       where: { OR: [{ formId: id }, { formId: form.slug }] },
     });
@@ -341,17 +388,29 @@ export class FormsService implements OnModuleInit {
   async submitForm(ctx: RequestContext, formIdOrSlug: string, dto: SubmitFormInput) {
     const form = await this.getForm(formIdOrSlug);
 
+    if (form.status !== 'published') {
+      throw new BadRequestException('This form is not currently accepting submissions');
+    }
+
     // Profile lookup
     const profile = await this.prisma.memberProfile.findFirst({
       where: { userId: ctx.user.id },
       include: { club: true },
     });
 
+    const hasDistrictManage =
+      ctx.access.isSuperAdmin ||
+      ctx.access.roles.some(
+        (r) =>
+          (r.roleKey === 'forms:manage' || r.roleKey === 'roles:manage') &&
+          (!r.scope || r.scope.type === 'none'),
+      );
+
     const applicantName = dto.applicantName || profile?.fullName || ctx.user.name;
     const applicantEmail = dto.applicantEmail || ctx.user.email;
     const applicantPhone = dto.applicantPhone || profile?.phone || '';
-    const clubId = dto.clubId || profile?.clubId || null;
-    const clubName = dto.clubName || profile?.club?.name || null;
+    const clubId = hasDistrictManage && dto.clubId ? dto.clubId : (profile?.clubId || null);
+    const clubName = hasDistrictManage && dto.clubName ? dto.clubName : (profile?.club?.name || dto.clubName || null);
 
     // Enforce 1-per-club limit for Host Club Application unless overrideLimit is permitted for superadmin
     const isHostClubForm =
@@ -448,6 +507,7 @@ export class FormsService implements OnModuleInit {
         OR: [{ id: formIdOrSlug }, { slug: formIdOrSlug }],
       },
     });
+    this.assertCanManageForm(ctx, form);
     const formId = form?.id ?? formIdOrSlug;
     const formSlug = form?.slug ?? formIdOrSlug;
 

@@ -1,4 +1,5 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { randomBytes } from 'crypto';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AuditService } from '../audit/audit.service';
 import { NotificationPort } from '../notifications/notification.port';
@@ -155,9 +156,18 @@ export class MembersService {
     if (!member) throw new NotFoundException('Member not found');
     await this.scope.assertCanAccessClubAny(access, ['members:approve', 'roles:manage'], member.clubId);
 
-    const tempPwd = newPassword || `Rotaract@${Math.random().toString(36).slice(-6)}!2026`;
+    // Prevent non-superadmins from resetting passwords of district officers or admins
+    if (!access.isSuperAdmin && (await this.repo.isPrivilegedUser(member.userId))) {
+      throw new ForbiddenException('Cannot reset the password of a district officer or administrator.');
+    }
+
+    const tempPwd =
+      newPassword || `Rotaract@${randomBytes(4).toString('hex')}!2026`;
     const passwordHash = await hashPassword(tempPwd);
     await this.repo.updateMemberPassword(member.userId, passwordHash);
+
+    // Revoke all active sessions of this member upon password change
+    await this.repo.revokeSessions(member.userId);
 
     await this.audit.record({
       actorId: access.userId,

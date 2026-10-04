@@ -1,5 +1,6 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { RequirePermission } from '../common/decorators/access.decorators';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { paginate, parseListQuery } from '../common/query/list-query';
@@ -35,6 +36,8 @@ export class DirectoryController {
 
   @Post(':memberId/request-contact')
   @RequirePermission('directory:view')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   async requestContact(
     @CurrentUser() ctx: RequestContext,
     @Param('memberId') memberId: string,

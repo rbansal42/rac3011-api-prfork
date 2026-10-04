@@ -72,7 +72,7 @@ export class DrrBookingsController {
     @CurrentUser() ctx: RequestContext,
     @Body() dto: CreateDrrBlockDto,
   ) {
-    return this.service.createBlock(ctx.user.id, dto);
+    return this.service.createBlock(ctx, dto);
   }
 
   @Delete('blocks/:id')
@@ -81,7 +81,7 @@ export class DrrBookingsController {
     @CurrentUser() ctx: RequestContext,
     @Param('id') id: string,
   ) {
-    await this.service.deleteBlock(ctx.user.id, id);
+    await this.service.deleteBlock(ctx, id);
     return { success: true };
   }
 }

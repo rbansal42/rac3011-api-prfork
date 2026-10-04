@@ -84,7 +84,7 @@ export class EmailProviderPool {
           text: message.text,
           from: message.from || env.MAIL_FROM,
           replyTo: message.replyTo,
-          cc: message.cc,
+          cc: this.config.maySendToRealRecipients ? message.cc : undefined,
         });
         return { provider: name };
       } catch (error) {

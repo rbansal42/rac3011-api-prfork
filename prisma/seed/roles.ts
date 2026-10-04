@@ -74,7 +74,7 @@ export const ROLES: RoleSeed[] = [
     name: 'Event Check-In Staff',
     description: 'Event gate staff with access to scan attendee QR codes and manage event check-in records',
     scopeType: 'none',
-    permissions: ['events:checkin', 'clubs:view', 'directory:view'],
+    permissions: ['events:checkin', 'directory:view'],
   },
   { key: 'super_admin', name: 'Super Admin', description: 'Every permission', scopeType: 'none', permissions: Object.keys(PERMISSIONS) },
   {

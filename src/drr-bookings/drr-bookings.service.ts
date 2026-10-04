@@ -237,9 +237,11 @@ export class DrrBookingsService {
   }
 
   async createBlock(
-    actorId: string,
+    ctx: RequestContext,
     input: { date?: string; startsAt?: string; endsAt?: string; reason?: string },
   ) {
+    this.assertOfficer(ctx);
+    const actorId = ctx.user.id;
     let startsAt: Date;
     let endsAt: Date;
 
@@ -291,7 +293,9 @@ export class DrrBookingsService {
     };
   }
 
-  async deleteBlock(actorId: string, id: string) {
+  async deleteBlock(ctx: RequestContext, id: string) {
+    this.assertOfficer(ctx);
+    const actorId = ctx.user.id;
     await this.repo.deleteBlock(id);
     await this.audit.record({
       actorId,
@@ -368,8 +372,6 @@ export class DrrBookingsService {
       confirmedDates: confirmedDatesList,
       dayStatus,
       confirmed: confirmed.map((c) => ({
-        id: c.id,
-        reference: c.reference,
         purpose: c.purpose,
         clubName: c.club?.shortName || c.club?.name || 'Rotaract Club',
         startsAt: c.startsAt.toISOString(),

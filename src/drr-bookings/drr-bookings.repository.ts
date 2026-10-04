@@ -106,17 +106,16 @@ export class DrrBookingsRepository {
     return !!row;
   }
 
-  // Only notify the designated District Rotaract Representative (DRR),
-  // Super Admins, Tech RID, and designated DSC secretariats (Himanshu, Shefali, Sarthak).
+  // Notify the designated District Rotaract Representative (DRR),
+  // Super Admins, and authorized calendar managers.
   async findOfficers(permissionKey: string): Promise<DrrOfficer[]> {
-    const TARGET_EMAILS = [
-      'himanshugulati.rotary@gmail.com',
-      'rtrshefali2004@gmail.com',
-      'sarthakmanchanda2@gmail.com',
-      'techrid3011@gmail.com',
-    ];
+    const envEmails = process.env.DRR_NOTIFY_EMAILS
+      ? process.env.DRR_NOTIFY_EMAILS.split(',')
+          .map((e) => e.trim().toLowerCase())
+          .filter(Boolean)
+      : [];
 
-    const [drrRows, adminRows, specificEmailUsers] = await Promise.all([
+    const [drrRows, adminRows, permissionRows, specificEmailUsers] = await Promise.all([
       this.prisma.userRole.findMany({
         where: {
           scopeType: 'none',
@@ -131,12 +130,25 @@ export class DrrBookingsRepository {
         },
         select: { userId: true, user: { select: { email: true } } },
       }),
-      this.prisma.user.findMany({
+      this.prisma.userRole.findMany({
         where: {
-          email: { in: TARGET_EMAILS, mode: 'insensitive' },
+          scopeType: 'none',
+          role: {
+            permissions: {
+              some: { permission: { key: permissionKey } },
+            },
+          },
         },
-        select: { id: true, email: true },
+        select: { userId: true, user: { select: { email: true } } },
       }),
+      envEmails.length > 0
+        ? this.prisma.user.findMany({
+            where: {
+              email: { in: envEmails, mode: 'insensitive' },
+            },
+            select: { id: true, email: true },
+          })
+        : Promise.resolve([]),
     ]);
 
     const byUser = new Map<string, DrrOfficer>();
@@ -145,6 +157,9 @@ export class DrrBookingsRepository {
       if (row.user?.email) byUser.set(row.userId, { userId: row.userId, email: row.user.email });
     }
     for (const row of adminRows) {
+      if (row.user?.email) byUser.set(row.userId, { userId: row.userId, email: row.user.email });
+    }
+    for (const row of permissionRows) {
       if (row.user?.email) byUser.set(row.userId, { userId: row.userId, email: row.user.email });
     }
     for (const u of specificEmailUsers) {

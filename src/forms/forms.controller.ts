@@ -92,7 +92,7 @@ export class FormsController {
   }
 
   @Patch(':id/submissions/:subId/status')
-  @RequirePermission('forms:responses:view', 'forms:manage', 'roles:manage')
+  @RequirePermission('forms:manage', 'roles:manage')
   async updateSubmissionStatus(
     @CurrentUser() ctx: RequestContext,
     @Param('id') id: string,
