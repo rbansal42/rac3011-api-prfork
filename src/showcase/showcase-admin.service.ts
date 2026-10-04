@@ -171,7 +171,7 @@ export class ShowcaseAdminService {
     if (existing.photos && existing.photos.length > 0) {
       for (const photo of existing.photos) {
         try {
-          await this.storage.purgeAssetByUrl(photo);
+          await this.storage.purgeAssetByUrl(photo, ctx.access.userId);
         } catch {
           // Log or continue cleanup
         }
@@ -226,7 +226,7 @@ export class ShowcaseAdminService {
       const newPhotosSet = new Set(input.photos);
       const removedPhotos = existing.photos.filter((p) => !newPhotosSet.has(p));
       for (const p of removedPhotos) {
-        await this.storage.purgeAssetByUrl(p).catch(() => {});
+        await this.storage.purgeAssetByUrl(p, ctx.access.userId).catch(() => {});
       }
     }
 

@@ -453,7 +453,7 @@ export class ReportsService {
     if (this.storage && existing.values && typeof existing.values === 'object') {
       const urls = this.extractFileUrls(existing.values);
       for (const url of urls) {
-        await this.storage.purgeAssetByUrl(url).catch(() => {});
+        await this.storage.purgeAssetByUrl(url, access.userId).catch(() => {});
       }
     }
 
