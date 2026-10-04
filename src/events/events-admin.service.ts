@@ -174,13 +174,13 @@ export class EventsAdminService {
     const slug = input.slug ? await this.uniqueSlug(input.slug, existing.id) : undefined;
 
     if (input.coverUrl !== undefined && input.coverUrl !== existing.coverUrl && existing.coverUrl) {
-      await this.storage.purgeAssetByUrl(existing.coverUrl).catch(() => {});
+      await this.storage.purgeAssetByUrl(existing.coverUrl, ctx.access.userId).catch(() => {});
     }
     if (input.photos !== undefined && existing.photos && existing.photos.length > 0) {
       const newPhotosSet = new Set(input.photos);
       const removedPhotos = existing.photos.filter((p) => !newPhotosSet.has(p));
       for (const p of removedPhotos) {
-        await this.storage.purgeAssetByUrl(p).catch(() => {});
+        await this.storage.purgeAssetByUrl(p, ctx.access.userId).catch(() => {});
       }
     }
 
@@ -217,11 +217,11 @@ export class EventsAdminService {
     await this.repo.remove(id);
 
     if (existing.coverUrl) {
-      await this.storage.purgeAssetByUrl(existing.coverUrl).catch(() => {});
+      await this.storage.purgeAssetByUrl(existing.coverUrl, ctx.access.userId).catch(() => {});
     }
     if (existing.photos && existing.photos.length > 0) {
       for (const p of existing.photos) {
-        await this.storage.purgeAssetByUrl(p).catch(() => {});
+        await this.storage.purgeAssetByUrl(p, ctx.access.userId).catch(() => {});
       }
     }
   }
@@ -262,13 +262,15 @@ export class EventsAdminService {
   ): Promise<{ row: CheckinRow; alreadyCheckedIn: boolean }> {
     const event = await this.mustFind(eventId);
 
-    // Verify caller has permission to perform check-in for this event BEFORE processing token
+    // Authorize before burning the token; district events need a district-scoped grant.
     if (event.isDistrictEvent) {
-      if (!hasGrant(ctx.access, CHECKIN) && !hasGrant(ctx.access, MANAGE)) {
-        throw new ForbiddenException('Missing events:checkin permission for district events');
+      if (!this.scope.hasDistrictScope(ctx.access, CHECKIN) && !this.scope.hasDistrictScope(ctx.access, MANAGE)) {
+        throw new ForbiddenException('Missing district events:checkin permission for district events');
       }
     } else if (event.clubId) {
       await this.scope.assertCanAccessClub(ctx.access, CHECKIN, event.clubId);
+    } else {
+      throw new ForbiddenException('Event has no club scope');
     }
 
     let memberId: string | null = null;
@@ -591,13 +593,15 @@ export class EventsAdminService {
   ): Promise<{ recipientCount: number; dispatchedCount: number }> {
     const event = await this.mustFind(eventId);
 
-    // Permission check: dispatching tickets requires MANAGE permission
+    // Dispatching tickets requires district-scoped events:manage for district events.
     if (event.isDistrictEvent) {
-      if (!hasGrant(ctx.access, MANAGE) && !ctx.access.isSuperAdmin) {
-        throw new ForbiddenException('Missing events:manage permission to dispatch tickets');
+      if (!this.scope.hasDistrictScope(ctx.access, MANAGE) && !ctx.access.isSuperAdmin) {
+        throw new ForbiddenException('Missing district events:manage permission to dispatch tickets');
       }
     } else if (event.clubId) {
       await this.scope.assertCanAccessClub(ctx.access, MANAGE, event.clubId);
+    } else {
+      throw new ForbiddenException('Event has no club scope');
     }
 
     interface Recipient {
